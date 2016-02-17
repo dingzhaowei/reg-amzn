@@ -1,4 +1,4 @@
-package com.ding.luna.ext.bean;
+package com.ding.luna.ext;
 
 public class Account {
 
@@ -13,6 +13,8 @@ public class Account {
     private String address = "随机选择";
 
     private String creditCard = "随机选择";
+
+    private String regProgress = "尚未开始";
 
     public Account(int i, String e, String p) {
         this.index = i;
@@ -54,6 +56,18 @@ public class Account {
 
     public void setCreditCard(String creditCard) {
         this.creditCard = creditCard;
+    }
+
+    public String getRegProgress() {
+        return regProgress;
+    }
+
+    public void setRegProgress(String regProgress) {
+        this.regProgress = regProgress;
+    }
+
+    public String toString() {
+        return String.format("[%s, %s, %s, %s, %s, %s]", index, email, password, realName, address, creditCard);
     }
 
 }

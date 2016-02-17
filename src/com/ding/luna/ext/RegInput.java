@@ -12,8 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import com.ding.luna.ext.bean.Account;
-
 public class RegInput {
 
     private static RegInput instance = new RegInput();
