@@ -1,0 +1,15 @@
+.root {
+  -fx-background-color: white;
+  -fx-font-family: 'monospace';
+}
+
+.root.popup {
+  -fx-background-color: transparent;
+}
+
+.dialog-header {
+  -fx-font-weight: lighter;
+  -fx-font-style: italic;
+  -fx-font-size: 10.0;
+  -fx-background-color: lightblue;
+}

@@ -1,0 +1,14 @@
+bin/
+build/*.xml
+build/build
+build/deploy
+build/dist
+build/externalLibs
+build/project
+
+.settings/
+.classpath
+.project
+
+*.log
+*.DS_Store
