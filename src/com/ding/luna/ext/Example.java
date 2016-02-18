@@ -6,6 +6,14 @@ public class Example {
         StringBuilder sb = new StringBuilder();
         sb.append("#############################################\n");
         sb.append("#\n");
+        sb.append("# 文件第一个非空白行填写国家 (日亚填日本，德亚填德国)\n");
+        sb.append("#\n");
+        sb.append("#############################################\n");
+        sb.append("\n");
+        sb.append("日本\n");
+        sb.append("\n");
+        sb.append("#############################################\n");
+        sb.append("#\n");
         sb.append("# 1. 地址区列出所有可选的地址，地址之间用空行分隔。\n");
         sb.append("#\n");
         sb.append("# 2. 地址对应着亚马逊网站填写地址的顺序，行与行对应，\n");

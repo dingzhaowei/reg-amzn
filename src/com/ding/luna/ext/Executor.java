@@ -6,6 +6,8 @@ import javafx.application.Platform;
 
 public class Executor {
 
+    private static final String USERAGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko";
+
     private RootView rv;
 
     private volatile int ns, nf;
@@ -64,8 +66,10 @@ public class Executor {
                 }
 
                 try {
+                    updateAccountProgress(a, "正在注册");
                     register(a);
                     ns++;
+                    updateAccountProgress(a, "注册成功");
                 } catch (Exception e) {
                     updateAccountProgress(a, "注册失败[" + e.getMessage() + "]");
                     nf++;
@@ -87,12 +91,8 @@ public class Executor {
     }
 
     private void register(Account a) throws Exception {
-        updateAccountProgress(a, "正在注册");
-        Thread.sleep(10000);
-        if (Math.random() > 0.5) {
-            throw new RuntimeException("1");
-        }
-        updateAccountProgress(a, "注册成功");
+        int timeout = 10000;
+
     }
 
     private void updateProgressWithCount(String msg) {

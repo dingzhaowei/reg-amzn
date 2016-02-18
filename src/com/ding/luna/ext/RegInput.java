@@ -16,11 +16,13 @@ public class RegInput {
 
     private static RegInput instance = new RegInput();
 
+    private String country;
+
+    private List<Account> accounts;
+
     private Map<String, List<String>> addresses;
 
     private Map<String, List<String>> creditCards;
-
-    private List<Account> accounts;
 
     public static RegInput instance() {
         return instance;
@@ -45,6 +47,7 @@ public class RegInput {
     }
 
     public void clear() {
+        country = null;
         addresses.clear();
         creditCards.clear();
         accounts.clear();
@@ -56,6 +59,12 @@ public class RegInput {
             String line = null;
             while ((line = in.readLine()) != null) {
                 line = line.trim();
+
+                if (country == null && !line.isEmpty() && !line.startsWith("#")) {
+                    country = line;
+                    continue;
+                }
+
                 if (line.contains("地址区开始")) {
                     readAddresses(in);
                 }
@@ -105,7 +114,7 @@ public class RegInput {
             if (line.isEmpty()) {
                 continue;
             }
-            String[] items = line.trim().split("\\s+");
+            String[] items = line.trim().split("\\s+", 3);
             Account account = new Account(i++, items[0], items[1]);
             account.setRealName(items.length > 2 ? items[2] : randomName());
             accounts.add(account);
