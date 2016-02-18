@@ -1,5 +1,8 @@
 package com.ding.luna.ext;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class Account {
 
     private int index;
@@ -16,10 +19,16 @@ public class Account {
 
     private volatile String regProgress = "-";
 
+    private Map<String, String> cookies = new HashMap<>();
+
     public Account(int i, String e, String p) {
         this.index = i;
         this.email = e;
         this.password = p;
+    }
+
+    public Map<String, String> cookies() {
+        return cookies;
     }
 
     public int getIndex() {

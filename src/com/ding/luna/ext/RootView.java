@@ -280,6 +280,15 @@ public class RootView {
             creditCardCol.setVisible(true);
         } );
 
+        captchaText.setOnAction(ae -> {
+            String text = captchaText.getText();
+            if (text.isEmpty()) {
+                return;
+            }
+            showCaptcha(null);
+            executor.recognizeCaptcha(text);
+        } );
+
         showExampleBtn.setOnAction(ae -> {
             Task<File> task = new Task<File>() {
 

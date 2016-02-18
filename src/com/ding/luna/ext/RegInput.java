@@ -34,16 +34,39 @@ public class RegInput {
         accounts = new ArrayList<>();
     }
 
+    public String getDomain() {
+        switch (country) {
+        case "日本":
+            return "www.amazon.co.jp";
+        case "德国":
+            return "www.amazon.de";
+        case "美国":
+            return "www.amazon.com";
+        case "英国":
+            return "www.amazon.co.uk";
+        case "法国":
+            return "www.amazon.fr";
+        case "加拿大":
+            return "www.amazon.ca";
+        case "意大利":
+            return "www.amazon.it";
+        case "西班牙":
+            return "www.amazon.es";
+        default:
+            return null;
+        }
+    }
+
+    public List<Account> getAccounts() {
+        return accounts;
+    }
+
     public Map<String, List<String>> getAddresses() {
         return addresses;
     }
 
     public Map<String, List<String>> getCreditCards() {
         return creditCards;
-    }
-
-    public List<Account> getAccounts() {
-        return accounts;
     }
 
     public void clear() {
