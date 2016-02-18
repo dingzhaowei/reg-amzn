@@ -79,6 +79,8 @@ public class RootView {
 
     BorderPane layout;
 
+    Executor executor;
+
     public RootView() {
         Label header = new Label();
         header.setText("请先点击‘示例’阅读，并按照相同格式编写数据文件。‘导入数据’后，点击‘开始注册’。注册完成后点‘导出结果’。");
@@ -235,6 +237,11 @@ public class RootView {
         progressLabel.setText(value);
     }
 
+    public void refreshAccountPrgress() {
+        regProgressCol.setVisible(false);
+        regProgressCol.setVisible(true);
+    }
+
     public void showCaptcha(String url) {
         if (url == null) {
             captchaView.setVisible(false);
@@ -307,6 +314,7 @@ public class RootView {
             File f = fileChooser.showOpenDialog(layout.getScene().getWindow());
             if (f != null) {
                 try {
+                    RegInput.instance().clear();
                     RegInput.instance().read(f);
 
                     List<String> options = new ArrayList<>();
@@ -340,20 +348,22 @@ public class RootView {
 
         startBtn.setOnAction(ae -> {
             saveRegisterConfiguration();
+            setConfigureFormDisable(true);
             Task<Void> task = new Task<Void>() {
 
                 @Override
                 protected Void call() throws Exception {
-                    new Executor(RootView.this).run();
+                    executor = new Executor(RootView.this);
+                    executor.run();
                     return null;
                 }
 
             };
             task.setOnSucceeded(e -> {
-
+                Platform.runLater(() -> setConfigureFormDisable(false));
             } );
             task.setOnFailed(e -> {
-
+                Platform.runLater(() -> setConfigureFormDisable(false));
             } );
             Thread t = new Thread(task);
             t.setDaemon(true);
@@ -361,8 +371,15 @@ public class RootView {
         } );
 
         stopBtn.setOnAction(ae -> {
-
+            executor.stop();
         } );
+    }
+
+    private void setConfigureFormDisable(boolean b) {
+        rangeField.setDisable(b);
+        numPerGroupField.setDisable(b);
+        intervalPerGroupField.setDisable(b);
+        intervalPerAccountField.setDisable(b);
     }
 
     private void saveRegisterConfiguration() {

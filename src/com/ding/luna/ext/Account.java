@@ -8,13 +8,13 @@ public class Account {
 
     private String password;
 
-    private String realName = "Luna{}";
+    private volatile String realName = "Luna{}";
 
-    private String address = "随机选择";
+    private volatile String address = "随机选择";
 
-    private String creditCard = "随机选择";
+    private volatile String creditCard = "随机选择";
 
-    private String regProgress = "尚未开始";
+    private volatile String regProgress = "-";
 
     public Account(int i, String e, String p) {
         this.index = i;
