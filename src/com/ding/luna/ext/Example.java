@@ -4,15 +4,15 @@ public class Example {
 
     public static String get() {
         StringBuilder sb = new StringBuilder();
-        sb.append("#############################################\n");
+        sb.append("###########################################################\n");
         sb.append("#\n");
         sb.append("# 文件第一个非空白行填写国家 (日亚填日本，德亚填德国)\n");
         sb.append("#\n");
-        sb.append("#############################################\n");
+        sb.append("###########################################################\n");
         sb.append("\n");
         sb.append("日本\n");
         sb.append("\n");
-        sb.append("#############################################\n");
+        sb.append("###########################################################\n");
         sb.append("#\n");
         sb.append("# 1. 地址区列出所有可选的地址，地址之间用空行分隔。\n");
         sb.append("#\n");
@@ -22,7 +22,7 @@ public class Example {
         sb.append("# 3. 行中如果包含'{}'，软件会自动替换成一个4位的随\n");
         sb.append("#    机数字串，如“0125”。\n");
         sb.append("#\n");
-        sb.append("#############################################\n");
+        sb.append("###########################################################\n");
         sb.append("\n");
         sb.append("**地址区开始**\n");
         sb.append("\n");
@@ -43,7 +43,7 @@ public class Example {
         sb.append("9012345678\n");
         sb.append("\n");
         sb.append("**地址区结束**\n\n");
-        sb.append("#############################################\n");
+        sb.append("###########################################################\n");
         sb.append("#\n");
         sb.append("# 1. 信用卡区列出所有可选的卡，卡与卡之间用空行分隔。\n");
         sb.append("#\n");
@@ -52,7 +52,7 @@ public class Example {
         sb.append("#\n");
         sb.append("# 3. 注意要写对卡种名称；到期时间格式为“月份/年份”。\n");
         sb.append("#\n");
-        sb.append("#############################################\n");
+        sb.append("###########################################################\n");
         sb.append("\n");
         sb.append("**信用卡区开始**\n");
         sb.append("\n");
@@ -82,7 +82,7 @@ public class Example {
         sb.append("12/2019\n");
         sb.append("\n");
         sb.append("**信用卡区结束**\n\n");
-        sb.append("#############################################\n");
+        sb.append("###########################################################\n");
         sb.append("#\n");
         sb.append("# 1. 账号区列出所有待注册的账号，账号之间不需要空行。\n");
         sb.append("#\n");
@@ -92,18 +92,18 @@ public class Example {
         sb.append("# 3. 姓名中如果包含‘{}’，软件会自动替换成一个4位的随\n");
         sb.append("#    机数字串，如“8729”。\n");
         sb.append("#\n");
-        sb.append("#############################################\n");
+        sb.append("###########################################################\n");
         sb.append("\n");
         sb.append("**账号区开始**\n");
         sb.append("\n");
-        sb.append("huawang001@gmail.com q123456\n");
-        sb.append("huawang002@gmail.com q123456\n");
-        sb.append("huawang003@gmail.com q123456\n");
-        sb.append("huawang004@gmail.com q123456 马小田{}\n");
-        sb.append("huawang005@gmail.com q123456 Li Lei\n");
+        sb.append("heguangtang4001@gmail.com q123456\n");
+        sb.append("heguangtang4002@gmail.com q123456\n");
+        sb.append("heguangtang4003@gmail.com q123456\n");
+        sb.append("heguangtang4004@gmail.com q123456 马小田{}\n");
+        sb.append("heguangtang4005@gmail.com q123456 Li Lei\n");
         sb.append("\n");
         sb.append("**账号区结束**");
-        return sb.toString();
+        return sb.toString().replace("\n", System.lineSeparator());
     }
 
 }
