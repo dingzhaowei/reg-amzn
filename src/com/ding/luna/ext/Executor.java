@@ -404,8 +404,11 @@ public class Executor {
 
         form = currPage.select("form[action*=/account/address]").first();
         data = populateCreditCard(form, creditCard, domain);
+        data.remove("ue_back");
+        data.remove("newAddress");
         Element submitBtn = form.select("input[name^=addressID_]").first();
-        data.put(submitBtn != null ? submitBtn.attr("name") : "addCreditCard", "Submit");
+        data.put(submitBtn.attr("name") + ".x", "70");
+        data.put(submitBtn.attr("name") + ".y", "10");
         currPage = getPage(form.absUrl("action"), a, data);
     }
 
