@@ -128,7 +128,7 @@ public class Executor {
 
         int bp = a.getLastBreakPoint();
 
-        if (bp < 1) {
+        if (bp <= 1) {
             try {
                 stage1(a, domain);
             } catch (Exception e) {
@@ -137,7 +137,7 @@ public class Executor {
             }
         }
 
-        if (bp < 2) {
+        if (bp <= 2) {
             try {
                 stage2(a, domain);
             } catch (Exception e) {
@@ -146,13 +146,13 @@ public class Executor {
             }
         }
 
-        if (bp < 3) {
+        if (bp <= 3) {
             try {
                 stage3(a, domain);
                 stage4(a, domain);
             } catch (Exception e) {
                 e.printStackTrace();
-                throw new RuntimeException("2");
+                throw new RuntimeException("3");
             }
         }
     }
@@ -209,6 +209,10 @@ public class Executor {
         }
 
         Element form = currPage.getElementById("ap_register_form");
+        if (form == null && currPage.getElementById("ap_signin_form") != null) {
+            return; // 已经存在账号，直接登录
+        }
+
         Map<String, String> data = extractFormData(form);
         String realName = replacePlaceHolder(a.getRealName());
         data.put("customerName", realName);
@@ -384,6 +388,7 @@ public class Executor {
         data.put("editPaymentMethod", "Submit");
         currPage = getPage(form.absUrl("action"), a, data);
         if (!currPage.select("input[id^=paymentMethod.]").isEmpty()) {
+            currPage = getPage(getAddrViewUrl(domain), a, null);
             return; // 已配置信用卡
         }
 
@@ -402,7 +407,13 @@ public class Executor {
             creditCard = creditCards.get(creditCardName);
         }
 
-        form = currPage.select("form[action*=/account/address]").first();
+        Elements forms = currPage.select("form[action*=/account/address]");
+        for (int i = 0; i < forms.size(); i++) {
+            form = forms.get(i);
+            if (form.getElementById("creditCardIssuer") != null) {
+                break;
+            }
+        }
         data = populateCreditCard(form, creditCard, domain);
         data.remove("ue_back");
         data.remove("newAddress");
@@ -433,9 +444,6 @@ public class Executor {
     }
 
     private void stage4(Account a, String domain) throws Exception {
-        if (!currPage.location().contains("/account/address")) {
-            currPage = getPage(getAddrViewUrl(domain), a, null);
-        }
         if (currPage.getElementById("one-click-address-exists") != null) {
             return; // 已有默认地址和支付
         }

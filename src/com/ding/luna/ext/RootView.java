@@ -2,11 +2,17 @@ package com.ding.luna.ext;
 
 import java.awt.Desktop;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 
 import javax.swing.SwingUtilities;
+
+import org.codehaus.jackson.map.ObjectMapper;
 
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -188,7 +194,7 @@ public class RootView {
         for (int j = 1; j <= 20; j++) {
             numPerGroupField.getItems().add(String.format("%d个/组", j));
         }
-        numPerGroupField.getSelectionModel().select(5);
+        numPerGroupField.getSelectionModel().select(10);
 
         intervalPerGroupField.getItems().add("无间隔");
         for (int j = 1; j <= 6; j++) {
@@ -200,7 +206,7 @@ public class RootView {
         for (int j = 1; j <= 4; j++) {
             intervalPerAccountField.getItems().add(String.format("%.1f分钟", j * 0.5));
         }
-        intervalPerAccountField.getSelectionModel().select(1);
+        intervalPerAccountField.getSelectionModel().select(0);
 
         VBox captchaBox = new VBox();
         captchaBox.setSpacing(2.5);
@@ -352,7 +358,64 @@ public class RootView {
         } );
 
         exportBtn.setOnAction(ae -> {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.setTitle("导出到文件");
+            fileChooser.setInitialDirectory(new File(System.getProperty("user.home")));
+            fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV File (*.csv)", "*.csv"));
+            File f = fileChooser.showSaveDialog(layout.getScene().getWindow());
+            if (f != null) {
+                StringBuilder sb = new StringBuilder();
+                String lineSeparator = System.getProperty("line.separator");
+                sb.append("账号名称").append(',');
+                sb.append("账号密码").append(',');
+                sb.append("所属区域").append(',');
+                sb.append("代理主机").append(',');
+                sb.append("代理端口").append(',');
+                sb.append("代理类型").append(',');
+                sb.append("Cookies").append(lineSeparator);
 
+                String domain = RegInput.instance().getDomain();
+                for (Account a : RegInput.instance().getAccounts()) {
+                    if (!a.getRegProgress().equals("注册成功")) {
+                        continue;
+                    }
+
+                    sb.append('"').append(a.getEmail()).append('"').append(',');
+                    sb.append('"').append(a.getPassword()).append('"').append(',');
+                    sb.append('"').append(domain.replace("www.", "")).append('"').append(',');
+                    sb.append('"').append('"').append(',');
+                    sb.append('"').append('"').append(',');
+                    sb.append('"').append('"').append(',');
+
+                    ObjectMapper om = new ObjectMapper();
+                    sb.append('"');
+                    try {
+                        String s = om.writeValueAsString(a.cookies());
+                        sb.append(new String(Base64.getEncoder().encode(s.getBytes("UTF-8")), "UTF-8"));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    sb.append('"').append(lineSeparator);
+                }
+
+                FileOutputStream output = null;
+                try {
+                    byte[] content = sb.toString().getBytes(Charset.defaultCharset());
+                    output = new FileOutputStream(f);
+                    output.write(content);
+                    output.flush();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                } finally {
+                    if (output != null) {
+                        try {
+                            output.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }
         } );
 
         startBtn.setOnAction(ae -> {
