@@ -74,10 +74,11 @@ public class Executor {
                     continue;
                 }
 
-                if (++n == RegConf.instance().getNumPerGroup()) {
+                int numPerGroup = RegConf.instance().getNumPerGroup();
+                if (++n == numPerGroup && numPerGroup > 0) {
                     updateAccountProgress(a, "组间休息");
                     waitForTime(RegConf.instance().getIntervalPerGroup());
-                    n = -1;
+                    n = 0;
                 } else if (n > 0) {
                     updateAccountProgress(a, "号间休息");
                     waitForTime(RegConf.instance().getIntervalPerAccount());
@@ -501,6 +502,10 @@ public class Executor {
     }
 
     private void waitForTime(long time) {
+        if (time == 0) {
+            return;
+        }
+
         long start = System.currentTimeMillis();
         while (!stop) {
             try {
