@@ -8,6 +8,7 @@ import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import javax.imageio.ImageIO;
 
@@ -16,6 +17,7 @@ import org.jsoup.Connection.Response;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 import javafx.application.Platform;
 
@@ -25,7 +27,11 @@ public class Executor {
 
     private static final int TIMEOUT = 10000;
 
+    private static Random random = new Random();
+
     private RootView rv;
+
+    private Document currPage;
 
     private String captchaText;
 
@@ -120,50 +126,86 @@ public class Executor {
             throw new RuntimeException("0");
         }
 
-        try {
-            stage1(a, domain);
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException("1");
-        }
-    }
+        int bp = a.getLastBreakPoint();
 
-    private void stage1(Account a, String domain) throws Exception {
-        String email = a.getEmail();
-        String password = a.getPassword();
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("https://").append(domain);
-        sb.append("/gp/css/order-history/ref=nav__gno_yam_yrdrs");
-        Document doc = getPage(sb.toString(), a, null);
-
-        Element link = doc.getElementById("createAccountSubmit");
-        if (link != null) {
-            doc = getPage(link.absUrl("href"), a, null);
-        } else {
-            Element form = doc.getElementById("ap_signin_form");
-            Map<String, String> data = extractFormData(form);
-            data.put("create", "1");
-            data.put("email", email);
-            doc = getPage(form.absUrl("action"), a, data);
-        }
-
-        captchaText = null;
-        if (isCaptchaPresent(doc)) {
-            processCaptcha(doc, a);
-            if (captchaText == null) {
-                throw new RuntimeException("Captcha fail1");
+        if (bp < 1) {
+            try {
+                stage1(a, domain);
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException("1");
             }
         }
 
-        Element form = doc.getElementById("ap_register_form");
+        if (bp < 2) {
+            try {
+                stage2(a, domain);
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException("2");
+            }
+        }
+    }
+
+    private String getLoginUrl(String domain) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("https://").append(domain);
+        sb.append("/gp/product/utility/edit-one-click-pref.html");
+        sb.append("/ref=dp_oc_signin?ie=UTF8&query=&returnPath=");
+        sb.append("%2Fgp%2Fcss%2Faccount%2Faddress%2Fview.html");
+        return sb.toString();
+    }
+
+    private String getAddrViewUrl(String domain) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("https://").append(domain);
+        sb.append("/gp/css/account/address/view.html");
+        sb.append("?ie=UTF8&ref_=ya_change_1_click");
+        return sb.toString();
+    }
+
+    private String getAddrEditUrl(String domain) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("https://").append(domain);
+        sb.append("/gp/css/account/address/view.html");
+        sb.append("?ie=UTF8&isDomestic=1&ref_=");
+        sb.append("myab_view_domestic_address_form&viewID=newAddress");
+        return sb.toString();
+    }
+
+    private void stage1(Account a, String domain) throws Exception {
+        currPage = getPage(getLoginUrl(domain), a, null);
+        if (currPage.location().contains("/account/address")) {
+            return;
+        }
+
+        Element link = currPage.getElementById("createAccountSubmit");
+        if (link != null) {
+            currPage = getPage(link.absUrl("href"), a, null);
+        } else {
+            Element form = currPage.getElementById("ap_signin_form");
+            Map<String, String> data = extractFormData(form);
+            data.put("create", "1");
+            data.put("email", a.getEmail());
+            currPage = getPage(form.absUrl("action"), a, data);
+        }
+
+        captchaText = null;
+        if (isCaptchaPresent(currPage)) {
+            processCaptcha(currPage, a);
+            if (captchaText == null) {
+                throw new RuntimeException("Captcha fail1-1");
+            }
+        }
+
+        Element form = currPage.getElementById("ap_register_form");
         Map<String, String> data = extractFormData(form);
         String realName = replacePlaceHolder(a.getRealName());
         data.put("customerName", realName);
-        data.put("email", email);
-        data.put("emailCheck", email);
-        data.put("password", password);
-        data.put("passwordCheck", password);
+        data.put("email", a.getEmail());
+        data.put("emailCheck", a.getEmail());
+        data.put("password", a.getPassword());
+        data.put("passwordCheck", a.getPassword());
         if (captchaText != null) {
             data.put("guess", captchaText);
         }
@@ -172,28 +214,125 @@ public class Executor {
         }
 
         try {
-            doc = getPage(form.absUrl("action"), a, data);
+            currPage = getPage(form.absUrl("action"), a, data);
             captchaText = null;
-            if (isCaptchaPresent(doc)) {
-                processCaptcha(doc, a);
+            if (isCaptchaPresent(currPage)) {
+                processCaptcha(currPage, a);
                 if (captchaText == null) {
-                    throw new RuntimeException("Captcha fail2");
+                    throw new RuntimeException("Captcha fail1-2");
                 }
-                form = doc.getElementById("ap_register_form");
+                form = currPage.getElementById("ap_register_form");
                 data = extractFormData(form);
-                data.put("password", password);
-                data.put("passwordCheck", password);
+                data.put("password", a.getPassword());
+                data.put("passwordCheck", a.getPassword());
                 data.put("guess", captchaText);
-                doc = getPage(form.absUrl("action"), a, data);
+                currPage = getPage(form.absUrl("action"), a, data);
             }
         } catch (Exception e) {
             System.err.print(e.getMessage());
-            doc = getPage("http://" + domain, a, null);
+            currPage = getPage(getLoginUrl(domain), a, null);
         }
-        link = doc.getElementById("nav-link-yourAccount");
+        link = currPage.getElementById("nav-link-yourAccount");
         if (link == null || !link.absUrl("href").contains("/gp/css/homepage.html")) {
-            savePageSource(doc, "/Users/dingzw/Desktop/debug.html");
+            savePageSource(currPage, "/Users/dingzw/Desktop/debug.html");
             throw new RuntimeException("Not landed on successful page");
+        }
+    }
+
+    private void stage2(Account a, String domain) throws Exception {
+        if (currPage == null || !currPage.location().contains("/account/address")) {
+            siginTo1ClickPage(a, domain);
+        }
+        if (!currPage.select("[id^=address-index]").isEmpty()) {
+            return;
+        }
+
+        Map<String, List<String>> addresses = RegInput.instance().getAddresses();
+        List<String> address = null;
+        String addrName = a.getAddress();
+        if (addrName.equals("随机选择")) {
+            int i = random.nextInt(addresses.size());
+            for (Map.Entry<String, List<String>> entry : addresses.entrySet()) {
+                if (--i < 0) {
+                    address = entry.getValue();
+                    break;
+                }
+            }
+        } else {
+            address = addresses.get(addrName);
+        }
+
+        currPage = getPage(getAddrEditUrl(domain), a, null);
+        Element form = currPage.select("form[action*=/account/address]").first();
+        Map<String, String> data = populateAddress(form, address, domain);
+        Element submitBtn = form.getElementById("myab_newAddressButton");
+        data.put(submitBtn.attr("name"), submitBtn.attr("value"));
+
+        currPage = getPage(form.absUrl("action"), a, data);
+        if (currPage.select("[id^=address-index]").isEmpty()) {
+            throw new RuntimeException("Address failed to be added");
+        }
+    }
+
+    private Map<String, String> populateAddress(Element form, List<String> address, String domain) {
+        Map<String, String> data = extractFormData(form);
+        if (domain.contains("amazon.co.jp")) {
+            data.put("enterAddressFullName", replacePlaceHolder(address.get(0)));
+
+            String[] postCode = replacePlaceHolder(address.get(1)).split("-");
+            data.put("enterAddressPostalCode", postCode[0]);
+            data.put("enterAddressPostalCode2", postCode[1]);
+
+            data.put("enterAddressStateOrRegion", replacePlaceHolder(address.get(2)));
+            data.put("enterAddressAddressLine1", replacePlaceHolder(address.get(3)));
+            data.put("enterAddressAddressLine2", replacePlaceHolder(address.get(4)));
+            data.put("enterAddressAddressLine3", replacePlaceHolder(address.get(5)));
+            data.put("enterAddressPhoneNumber", replacePlaceHolder(address.get(6)));
+        } else {
+            data.put("enterAddressFullName", replacePlaceHolder(address.get(0)));
+            data.put("enterAddressAddressLine1", replacePlaceHolder(address.get(1)));
+            data.put("enterAddressAddressLine2", replacePlaceHolder(address.get(2)));
+            data.put("enterAddressCity", replacePlaceHolder(address.get(3)));
+            data.put("enterAddressStateOrRegion", replacePlaceHolder(address.get(4)));
+            data.put("enterAddressPostalCode", replacePlaceHolder(address.get(5)));
+
+            Elements options = form.getElementById("enterAddressCountryCode").select("option");
+            String country = replacePlaceHolder(address.get(6)), countryCode = "";
+            for (Element option : options) {
+                if (option.text().trim().equals(country)) {
+                    break;
+                }
+            }
+            data.put("enterAddressCountryCode", countryCode);
+            data.put("enterAddressPhoneNumber", replacePlaceHolder(address.get(7)));
+        }
+        return data;
+    }
+
+    private void siginTo1ClickPage(Account a, String domain) throws Exception {
+        currPage = getPage(getLoginUrl(domain), a, null);
+        if (currPage.location().contains("/ap/signin")) {
+            Element form = currPage.select("form[action*=/ap/signin]").first();
+            Map<String, String> data = extractFormData(form);
+            data.put("email", a.getEmail());
+            data.put("password", a.getPassword());
+            currPage = getPage(form.absUrl("action"), a, data);
+
+            captchaText = null;
+            if (isCaptchaPresent(currPage)) {
+                processCaptcha(currPage, a);
+                if (captchaText == null) {
+                    throw new RuntimeException("Captcha fail2");
+                }
+                form = currPage.select("form[action*=/ap/signin]").first();
+                data = extractFormData(form);
+                data.put("password", a.getPassword());
+                data.put("guess", captchaText);
+                currPage = getPage(form.absUrl("action"), a, data);
+            }
+        }
+        if (!currPage.location().contains("/account/address")) {
+            currPage = getPage(getAddrViewUrl(domain), a, null);
         }
     }
 
@@ -275,6 +414,9 @@ public class Executor {
     }
 
     private String replacePlaceHolder(String s) {
+        if (s.equals("-")) {
+            return "";
+        }
         s = s.replace("｛｝", "{}");
         return s.replace("{}", String.format("%04d", (int) (Math.random() * 10000)));
     }

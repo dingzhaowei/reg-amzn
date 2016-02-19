@@ -11,6 +11,8 @@ public class Account {
 
     private String password;
 
+    private int lastBreakPoint;
+
     private volatile String realName = "Luna{}";
 
     private volatile String address = "随机选择";
@@ -43,6 +45,10 @@ public class Account {
         return password;
     }
 
+    public int getLastBreakPoint() {
+        return lastBreakPoint;
+    }
+
     public String getRealName() {
         return realName;
     }
@@ -73,6 +79,11 @@ public class Account {
 
     public void setRegProgress(String regProgress) {
         this.regProgress = regProgress;
+        if (regProgress.contains("失败")) {
+            int i = regProgress.lastIndexOf('[');
+            int j = regProgress.lastIndexOf(']');
+            lastBreakPoint = Integer.parseInt(regProgress.substring(i + 1, j));
+        }
     }
 
     public String toString() {
