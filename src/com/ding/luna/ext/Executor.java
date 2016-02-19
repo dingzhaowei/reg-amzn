@@ -145,6 +145,16 @@ public class Executor {
                 throw new RuntimeException("2");
             }
         }
+
+        if (bp < 3) {
+            try {
+                stage3(a, domain);
+                stage4(a, domain);
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException("2");
+            }
+        }
     }
 
     private String getLoginUrl(String domain) {
@@ -239,12 +249,56 @@ public class Executor {
         }
     }
 
+    private boolean isCaptchaPresent(Document doc) {
+        if (doc.getElementById("ap_captcha_guess") != null) {
+            return true;
+        }
+        return doc.getElementById("auth-captcha-image") != null;
+    }
+
+    private void processCaptcha(Document doc, Account a) throws Exception {
+        Element img = null;
+        if (doc.getElementById("auth-captcha-image") != null) {
+            img = doc.getElementById("auth-captcha-image");
+        } else {
+            img = doc.getElementById("ap_captcha_img").select("img").first();
+        }
+
+        Connection conn = Jsoup.connect(img.absUrl("src"));
+        conn.userAgent(USERAGENT).timeout(15000).cookies(a.cookies());
+        Response resp = conn.ignoreContentType(true).execute();
+        File captchaFile = File.createTempFile("captcha", ".jpg");
+        ImageIO.write(byteArrayToImage(resp.bodyAsBytes()), "jpg", captchaFile);
+
+        Platform.runLater(() -> {
+            try {
+                rv.showCaptcha(captchaFile.toURI().toURL().toExternalForm());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } );
+        synchronized (this) {
+            while (true) {
+                try {
+                    wait(60000);
+                    break;
+                } catch (Exception e) {
+                    // continue
+                }
+            }
+        }
+        if (captchaText == null) {
+            Platform.runLater(() -> rv.showCaptcha(null));
+            throw new RuntimeException("Captcha is not resolved");
+        }
+    }
+
     private void stage2(Account a, String domain) throws Exception {
         if (currPage == null || !currPage.location().contains("/account/address")) {
-            siginTo1ClickPage(a, domain);
+            siginToAddrView(a, domain);
         }
         if (!currPage.select("[id^=address-index]").isEmpty()) {
-            return;
+            return; // 已添加过地址
         }
 
         Map<String, List<String>> addresses = RegInput.instance().getAddresses();
@@ -300,6 +354,7 @@ public class Executor {
             String country = replacePlaceHolder(address.get(6)), countryCode = "";
             for (Element option : options) {
                 if (option.text().trim().equals(country)) {
+                    countryCode = option.attr("value");
                     break;
                 }
             }
@@ -309,7 +364,86 @@ public class Executor {
         return data;
     }
 
-    private void siginTo1ClickPage(Account a, String domain) throws Exception {
+    private void stage3(Account a, String domain) throws Exception {
+        if (currPage == null || !currPage.location().contains("/account/address")) {
+            siginToAddrView(a, domain);
+        }
+        if (currPage.select("[id^=address-index]").isEmpty()) {
+            throw new RuntimeException("There is no address");
+        }
+
+        Element addr = null;
+        for (int i = 0; i < 2; i++) {
+            if ((addr = currPage.getElementById("address-index-" + i)) != null) {
+                break;
+            }
+        }
+
+        Element form = addr.select("form[action*=editPaymentMethod]").first();
+        Map<String, String> data = extractFormData(form);
+        data.put("editPaymentMethod", "Submit");
+        currPage = getPage(form.absUrl("action"), a, data);
+        if (!currPage.select("input[id^=paymentMethod.]").isEmpty()) {
+            return; // 已配置信用卡
+        }
+
+        Map<String, List<String>> creditCards = RegInput.instance().getCreditCards();
+        List<String> creditCard = null;
+        String creditCardName = a.getCreditCard();
+        if (creditCardName.equals("随机选择")) {
+            int i = random.nextInt(creditCards.size());
+            for (Map.Entry<String, List<String>> entry : creditCards.entrySet()) {
+                if (--i < 0) {
+                    creditCard = entry.getValue();
+                    break;
+                }
+            }
+        } else {
+            creditCard = creditCards.get(creditCardName);
+        }
+
+        form = currPage.select("form[action*=/account/address]").first();
+        data = populateCreditCard(form, creditCard, domain);
+        Element submitBtn = form.select("input[name^=addressID_]").first();
+        data.put(submitBtn != null ? submitBtn.attr("name") : "addCreditCard", "Submit");
+        currPage = getPage(form.absUrl("action"), a, data);
+    }
+
+    private Map<String, String> populateCreditCard(Element form, List<String> creditCard, String domain) {
+        Map<String, String> data = extractFormData(form);
+
+        Elements options = form.getElementById("creditCardIssuer").select("option");
+        String cardIssuer = creditCard.get(0), cardIssuerCode = "V0";
+        for (Element option : options) {
+            if (option.text().trim().contains(cardIssuer)) {
+                cardIssuerCode = option.attr("value");
+                break;
+            }
+        }
+        data.put("creditCardIssuer", cardIssuerCode);
+        data.put("addCreditCardNumber", replacePlaceHolder(creditCard.get(1)));
+        data.put("card-name", replacePlaceHolder(creditCard.get(2)));
+        String[] pair = creditCard.get(3).split("/");
+        data.put("newCreditCardMonth", pair[0].trim());
+        data.put("newCreditCardYear", pair[1].trim());
+        return data;
+    }
+
+    private void stage4(Account a, String domain) throws Exception {
+        if (!currPage.location().contains("/account/address")) {
+            currPage = getPage(getAddrViewUrl(domain), a, null);
+        }
+        if (currPage.getElementById("one-click-address-exists") != null) {
+            return; // 已有默认地址和支付
+        }
+        Element link = currPage.getElementById("myab-make-1click-link-1").select("a").first();
+        currPage = getPage(link.absUrl("href"), a, null);
+        if (currPage.getElementById("one-click-address-exists") == null) {
+            throw new RuntimeException("Failed to set default address");
+        }
+    }
+
+    private void siginToAddrView(Account a, String domain) throws Exception {
         currPage = getPage(getLoginUrl(domain), a, null);
         if (currPage.location().contains("/ap/signin")) {
             Element form = currPage.select("form[action*=/ap/signin]").first();
@@ -333,50 +467,6 @@ public class Executor {
         }
         if (!currPage.location().contains("/account/address")) {
             currPage = getPage(getAddrViewUrl(domain), a, null);
-        }
-    }
-
-    private boolean isCaptchaPresent(Document doc) {
-        if (doc.getElementById("ap_captcha_guess") != null) {
-            return true;
-        }
-        return doc.getElementById("auth-captcha-image") != null;
-    }
-
-    private void processCaptcha(Document doc, Account a) throws Exception {
-        Element img = null;
-        if (doc.getElementById("auth-captcha-image") != null) {
-            img = doc.getElementById("auth-captcha-image");
-        } else {
-            img = doc.getElementById("ap_captcha_img").select("img").first();
-        }
-
-        Connection conn = Jsoup.connect(img.absUrl("src"));
-        conn.userAgent(USERAGENT).timeout(15000).cookies(a.cookies());
-        Response resp = conn.ignoreContentType(true).execute();
-        File captchaFile = File.createTempFile("captcha", ".jpg");
-        ImageIO.write(byteArrayToImage(resp.bodyAsBytes()), "jpg", captchaFile);
-
-        Platform.runLater(() -> {
-            try {
-                rv.showCaptcha(captchaFile.toURI().toURL().toExternalForm());
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        } );
-        synchronized (this) {
-            while (true) {
-                try {
-                    wait(60000);
-                    break;
-                } catch (Exception e) {
-                    // continue
-                }
-            }
-        }
-        if (captchaText == null) {
-            Platform.runLater(() -> rv.showCaptcha(null));
-            throw new RuntimeException("Captcha is not resolved");
         }
     }
 
