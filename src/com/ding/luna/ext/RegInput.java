@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.PushbackInputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -77,19 +76,8 @@ public class RegInput {
     }
 
     public void read(File f) throws IOException {
-        PushbackInputStream pis = new PushbackInputStream(new FileInputStream(f), 3);
-        try {
-            byte[] b = new byte[3];
-            pis.read(b, 0, 3);
-            if (b[0] != 0xEF || b[1] != 0xBB || b[2] != 0xBF) {
-                pis.unread(b);
-            }
-        } catch (Exception e) {
-            pis.close();
-            throw new RuntimeException(e);
-        }
-
-        BufferedReader in = new BufferedReader(new InputStreamReader(pis, "UTF-8"));
+        BufferedReader in = new BufferedReader(
+                new InputStreamReader(new UnicodeInputStream(new FileInputStream(f)), "UTF-8"));
         try {
             String line = null;
             while ((line = in.readLine()) != null) {
