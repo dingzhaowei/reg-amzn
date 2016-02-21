@@ -443,7 +443,9 @@ public class RootView {
         } );
 
         stopBtn.setOnAction(ae -> {
-            executor.stop();
+            if (executor != null) {
+                executor.stop();
+            }
         } );
     }
 
