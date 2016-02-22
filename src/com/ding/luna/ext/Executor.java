@@ -139,6 +139,7 @@ public class Executor {
                 updateAccountProgress(a, "建立账号");
                 stage1(a, domain);
             } catch (Exception e) {
+                saveCurrentPage();
                 e.printStackTrace();
                 throw new RuntimeException("1");
             }
@@ -149,6 +150,7 @@ public class Executor {
                 updateAccountProgress(a, "添加地址");
                 stage2(a, domain);
             } catch (Exception e) {
+                saveCurrentPage();
                 e.printStackTrace();
                 throw new RuntimeException("2");
             }
@@ -160,6 +162,7 @@ public class Executor {
                 stage3(a, domain);
                 stage4(a, domain);
             } catch (Exception e) {
+                saveCurrentPage();
                 e.printStackTrace();
                 throw new RuntimeException("3");
             }
@@ -265,7 +268,6 @@ public class Executor {
         }
         link = currPage.getElementById("nav-link-yourAccount");
         if (link == null || !link.absUrl("href").contains("/gp/css/homepage.html")) {
-            savePageSource(currPage, "/Users/dingzw/Desktop/debug.html");
             throw new RuntimeException("Not landed on successful page");
         }
         LOG.info(a.getEmail() + "的账号已经成功建立，准备添加地址和支付");
@@ -588,11 +590,11 @@ public class Executor {
         }
     }
 
-    void savePageSource(Document doc, String path) {
+    void saveCurrentPage() {
         PrintWriter writer = null;
         try {
-            writer = new PrintWriter(path);
-            writer.print(doc.outerHtml());
+            writer = new PrintWriter(System.getProperty("user.home") + File.separator + "reg-amzn-fail.html");
+            writer.print(currPage.outerHtml());
             writer.flush();
         } catch (Exception e) {
             e.printStackTrace();
