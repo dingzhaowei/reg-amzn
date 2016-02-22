@@ -12,7 +12,7 @@ import java.util.List;
 
 import javax.swing.SwingUtilities;
 
-import org.codehaus.jackson.map.ObjectMapper;
+import com.google.gson.Gson;
 
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -387,10 +387,10 @@ public class RootView {
                     sb.append('"').append('"').append(',');
                     sb.append('"').append('"').append(',');
 
-                    ObjectMapper om = new ObjectMapper();
+                    Gson gson = new Gson();
                     sb.append('"');
                     try {
-                        String s = om.writeValueAsString(a.cookies());
+                        String s = gson.toJson(a.cookies());
                         sb.append(new String(Base64.getEncoder().encode(s.getBytes("UTF-8")), "UTF-8"));
                     } catch (Exception e) {
                         e.printStackTrace();

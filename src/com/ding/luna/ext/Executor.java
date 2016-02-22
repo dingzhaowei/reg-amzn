@@ -3,17 +3,14 @@ package com.ding.luna.ext;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.logging.SimpleFormatter;
 
 import javax.imageio.ImageIO;
 
@@ -32,9 +29,9 @@ public class Executor {
 
     private static final int TIMEOUT = 10000;
 
-    private static Random random = new Random();
+    private static final Random RAND = new Random();
 
-    private Logger logger;
+    private static final Logger LOG = Logger.getLogger(Executor.class.getName());
 
     private RootView rv;
 
@@ -48,17 +45,7 @@ public class Executor {
 
     public Executor(RootView rv) {
         this.rv = rv;
-        logger = Logger.getLogger(Executor.class.getName());
-        logger.setLevel(Level.INFO);
-        logger.setUseParentHandlers(false);
-        String logFile = System.getProperty("user.home") + File.separator + "reg-amzn.log";
-        try {
-            FileHandler fh = new FileHandler(logFile, 50 * 1024, 1, true);
-            fh.setFormatter(new SimpleFormatter());
-            logger.addHandler(fh);
-        } catch (SecurityException | IOException e) {
-            e.printStackTrace();
-        }
+        LOG.setLevel(Level.INFO);
     }
 
     public void run() {
@@ -208,11 +195,11 @@ public class Executor {
     private void stage1(Account a, String domain) throws Exception {
         currPage = getPage(getLoginUrl(domain), a, null);
         if (currPage.location().contains("/account/address")) {
-            logger.info(a.getEmail() + "已经是登录状态，跳过阶段1");
+            LOG.info(a.getEmail() + "已经是登录状态，跳过阶段1");
             return;
         }
 
-        logger.info(a.getEmail() + "准备跳转到账号注册页面");
+        LOG.info(a.getEmail() + "准备跳转到账号注册页面");
 
         Element link = currPage.getElementById("createAccountSubmit");
         if (link != null) {
@@ -227,7 +214,7 @@ public class Executor {
 
         captchaText = null;
         if (isCaptchaPresent(currPage)) {
-            logger.info(a.getEmail() + "遇到验证码，要求用户输入");
+            LOG.info(a.getEmail() + "遇到验证码，要求用户输入");
             processCaptcha(currPage, a);
             if (captchaText == null) {
                 throw new RuntimeException("Captcha fail1-1");
@@ -236,11 +223,11 @@ public class Executor {
 
         Element form = currPage.getElementById("ap_register_form");
         if (form == null && currPage.getElementById("ap_signin_form") != null) {
-            logger.info(a.getEmail() + "可能已经被注册过，跳过阶段1");
+            LOG.info(a.getEmail() + "可能已经被注册过，跳过阶段1");
             return; // 已经存在账号，直接登录
         }
 
-        logger.info(a.getEmail() + "开始填写注册信息并提交");
+        LOG.info(a.getEmail() + "开始填写注册信息并提交");
         Map<String, String> data = extractFormData(form);
         String realName = replacePlaceHolder(a.getRealName());
         data.put("customerName", realName);
@@ -259,12 +246,12 @@ public class Executor {
             currPage = getPage(form.absUrl("action"), a, data);
             captchaText = null;
             if (isCaptchaPresent(currPage)) {
-                logger.info(a.getEmail() + "遇到验证码，要求用户输入");
+                LOG.info(a.getEmail() + "遇到验证码，要求用户输入");
                 processCaptcha(currPage, a);
                 if (captchaText == null) {
                     throw new RuntimeException("Captcha fail1-2");
                 }
-                logger.info(a.getEmail() + "重新带验证码提交注册");
+                LOG.info(a.getEmail() + "重新带验证码提交注册");
                 form = currPage.getElementById("ap_register_form");
                 data = extractFormData(form);
                 data.put("password", a.getPassword());
@@ -273,7 +260,7 @@ public class Executor {
                 currPage = getPage(form.absUrl("action"), a, data);
             }
         } catch (Exception e) {
-            logger.info(a.getEmail() + "提交注册时遇到问题，检查是否已成功");
+            LOG.info(a.getEmail() + "提交注册时遇到问题，检查是否已成功");
             currPage = getPage(getLoginUrl(domain), a, null);
         }
         link = currPage.getElementById("nav-link-yourAccount");
@@ -281,7 +268,7 @@ public class Executor {
             savePageSource(currPage, "/Users/dingzw/Desktop/debug.html");
             throw new RuntimeException("Not landed on successful page");
         }
-        logger.info(a.getEmail() + "的账号已经成功建立，准备添加地址和支付");
+        LOG.info(a.getEmail() + "的账号已经成功建立，准备添加地址和支付");
     }
 
     private boolean isCaptchaPresent(Document doc) {
@@ -330,11 +317,11 @@ public class Executor {
 
     private void stage2(Account a, String domain) throws Exception {
         if (currPage == null || !currPage.location().contains("/account/address")) {
-            logger.info(a.getEmail() + "通过登录跳到地址/一键管理页面");
+            LOG.info(a.getEmail() + "通过登录跳到地址/一键管理页面");
             siginToAddrView(a, domain);
         }
         if (!currPage.select("[id^=address-index]").isEmpty()) {
-            logger.info(a.getEmail() + "已经有之前添加的地址，跳过阶段2");
+            LOG.info(a.getEmail() + "已经有之前添加的地址，跳过阶段2");
             return; // 已添加过地址
         }
 
@@ -342,7 +329,7 @@ public class Executor {
         List<String> address = null;
         String addrName = a.getAddress();
         if (addrName.equals("随机选择")) {
-            int i = random.nextInt(addresses.size());
+            int i = RAND.nextInt(addresses.size());
             for (Map.Entry<String, List<String>> entry : addresses.entrySet()) {
                 if (--i < 0) {
                     address = entry.getValue();
@@ -353,10 +340,10 @@ public class Executor {
             address = addresses.get(addrName);
         }
 
-        logger.info(a.getEmail() + "准备进入地址添加页面");
+        LOG.info(a.getEmail() + "准备进入地址添加页面");
         currPage = getPage(getAddrEditUrl(domain), a, null);
 
-        logger.info(a.getEmail() + "准备填写并提交新地址");
+        LOG.info(a.getEmail() + "准备填写并提交新地址");
         Element form = currPage.select("form[action*=/account/address]").first();
         Map<String, String> data = populateAddress(form, address, domain);
         Element submitBtn = form.getElementById("myab_newAddressButton");
@@ -365,7 +352,7 @@ public class Executor {
         if (currPage.select("[id^=address-index]").isEmpty()) {
             throw new RuntimeException("Address failed to be added");
         }
-        logger.info(a.getEmail() + "新地址添加成功，准备添加支付");
+        LOG.info(a.getEmail() + "新地址添加成功，准备添加支付");
     }
 
     private Map<String, String> populateAddress(Element form, List<String> address, String domain) {
@@ -406,7 +393,7 @@ public class Executor {
 
     private void stage3(Account a, String domain) throws Exception {
         if (currPage == null || !currPage.location().contains("/account/address")) {
-            logger.info(a.getEmail() + "通过登录跳到地址/一键管理页面");
+            LOG.info(a.getEmail() + "通过登录跳到地址/一键管理页面");
             siginToAddrView(a, domain);
         }
         if (currPage.select("[id^=address-index]").isEmpty()) {
@@ -420,13 +407,13 @@ public class Executor {
             }
         }
 
-        logger.info(a.getEmail() + "准备进入支付设置页面");
+        LOG.info(a.getEmail() + "准备进入支付设置页面");
         Element form = addr.select("form[action*=editPaymentMethod]").first();
         Map<String, String> data = extractFormData(form);
         data.put("editPaymentMethod", "Submit");
         currPage = getPage(form.absUrl("action"), a, data);
         if (!currPage.select("input[id^=paymentMethod.]").isEmpty()) {
-            logger.info(a.getEmail() + "之前已经配置过信用卡，跳过阶段3");
+            LOG.info(a.getEmail() + "之前已经配置过信用卡，跳过阶段3");
             currPage = getPage(getAddrViewUrl(domain), a, null);
             return; // 已配置信用卡
         }
@@ -435,7 +422,7 @@ public class Executor {
         List<String> creditCard = null;
         String creditCardName = a.getCreditCard();
         if (creditCardName.equals("随机选择")) {
-            int i = random.nextInt(creditCards.size());
+            int i = RAND.nextInt(creditCards.size());
             for (Map.Entry<String, List<String>> entry : creditCards.entrySet()) {
                 if (--i < 0) {
                     creditCard = entry.getValue();
@@ -446,7 +433,7 @@ public class Executor {
             creditCard = creditCards.get(creditCardName);
         }
 
-        logger.info(a.getEmail() + "准备填写并提交支付信息");
+        LOG.info(a.getEmail() + "准备填写并提交支付信息");
         Elements forms = currPage.select("form[action*=/account/address]");
         for (int i = 0; i < forms.size(); i++) {
             form = forms.get(i);
@@ -461,7 +448,7 @@ public class Executor {
         data.put(submitBtn.attr("name") + ".x", "70");
         data.put(submitBtn.attr("name") + ".y", "10");
         currPage = getPage(form.absUrl("action"), a, data);
-        logger.info(a.getEmail() + "的信用卡信息应已设置成功");
+        LOG.info(a.getEmail() + "的信用卡信息应已设置成功");
     }
 
     private Map<String, String> populateCreditCard(Element form, List<String> creditCard, String domain) {
@@ -486,16 +473,16 @@ public class Executor {
 
     private void stage4(Account a, String domain) throws Exception {
         if (currPage.getElementById("one-click-address-exists") != null) {
-            logger.info(a.getEmail() + "的默认一键地址&支付已存在，注册成功");
+            LOG.info(a.getEmail() + "的默认一键地址&支付已存在，注册成功");
             return; // 已有默认地址和支付
         }
-        logger.info(a.getEmail() + "将追加的地址&支付设置为默认");
+        LOG.info(a.getEmail() + "将追加的地址&支付设置为默认");
         Element link = currPage.getElementById("myab-make-1click-link-1").select("a").first();
         currPage = getPage(link.absUrl("href"), a, null);
         if (currPage.getElementById("one-click-address-exists") == null) {
             throw new RuntimeException("Failed to set default address");
         }
-        logger.info(a.getEmail() + "注册成功");
+        LOG.info(a.getEmail() + "注册成功");
     }
 
     private void siginToAddrView(Account a, String domain) throws Exception {

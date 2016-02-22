@@ -13,6 +13,7 @@ public class Main extends Application {
             scene.getStylesheets().add(getClass().getResource("application.css").toExternalForm());
             primaryStage.setScene(scene);
             primaryStage.sizeToScene();
+            primaryStage.setTitle("亚马逊账号自动注册工具");
             primaryStage.show();
         } catch (Exception e) {
             e.printStackTrace();
@@ -20,6 +21,9 @@ public class Main extends Application {
     }
 
     public static void main(String[] args) {
+        if (System.getProperty("luna") == null) {
+            System.exit(1);
+        }
         launch(args);
     }
 }
