@@ -225,9 +225,12 @@ public class Executor {
         }
 
         Element form = currPage.getElementById("ap_register_form");
-        if (form == null && currPage.getElementById("ap_signin_form") != null) {
-            LOG.info(a.getEmail() + "可能已经被注册过，跳过阶段1");
-            return; // 已经存在账号，直接登录
+        if (form == null) {
+            if (isThereHintForExistedAccount()) {
+                LOG.info(a.getEmail() + "可能已经被注册过，跳过阶段1");
+                return; // 已经存在账号，直接登录
+            }
+            throw new RuntimeException("页面上找不到注册表单");
         }
 
         LOG.info(a.getEmail() + "开始填写注册信息并提交");
@@ -271,6 +274,13 @@ public class Executor {
             throw new RuntimeException("Not landed on successful page");
         }
         LOG.info(a.getEmail() + "的账号已经成功建立，准备添加地址和支付");
+    }
+
+    private boolean isThereHintForExistedAccount() {
+        if (currPage.getElementById("ap_signin_form") != null) {
+            return true;
+        }
+        return currPage.getElementById("ap_email_verify_warn_register_pagelet") != null;
     }
 
     private boolean isCaptchaPresent(Document doc) {
