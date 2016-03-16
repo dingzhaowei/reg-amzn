@@ -5,6 +5,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,6 +18,14 @@ public class RegInput {
     private static RegInput instance = new RegInput();
 
     private String country;
+
+    private int proxyIndex;
+
+    private String proxyUser;
+
+    private String proxyPass;
+
+    private List<Proxy> proxies;
 
     private List<Account> accounts;
 
@@ -31,6 +41,7 @@ public class RegInput {
         addresses = new LinkedHashMap<>();
         creditCards = new LinkedHashMap<>();
         accounts = new ArrayList<>();
+        proxies = new ArrayList<>();
     }
 
     public String getDomain() {
@@ -54,6 +65,29 @@ public class RegInput {
         default:
             return null;
         }
+    }
+
+    public boolean hasProxy() {
+        return !proxies.isEmpty();
+    }
+
+    public Proxy getProxy() {
+        if (proxies.isEmpty()) {
+            return null;
+        }
+        int i = proxyIndex++;
+        if (proxyIndex >= proxies.size()) {
+            proxyIndex = 0;
+        }
+        return proxies.get(i);
+    }
+
+    public String getProxyUserName() {
+        return proxyUser;
+    }
+
+    public String getProxyPassword() {
+        return proxyPass;
     }
 
     public List<Account> getAccounts() {
@@ -90,12 +124,12 @@ public class RegInput {
 
                 if (line.contains("地址区开始")) {
                     readAddresses(in);
-                }
-                if (line.contains("信用卡区开始")) {
+                } else if (line.contains("信用卡区开始")) {
                     readCreditCards(in);
-                }
-                if (line.contains("账号区开始")) {
+                } else if (line.contains("账号区开始")) {
                     readAccounts(in);
+                } else if (line.contains("代理区开始")) {
+                    readProxies(in);
                 }
             }
         } finally {
@@ -141,6 +175,34 @@ public class RegInput {
             Account account = new Account(i++, items[0], items[1]);
             account.setRealName(items.length > 2 ? items[2] : randomName());
             accounts.add(account);
+        }
+    }
+
+    private void readProxies(BufferedReader in) throws IOException {
+        while (true) {
+            String line = in.readLine();
+            if (line == null || line.contains("**代理区结束**")) {
+                break;
+            }
+            if (line.isEmpty()) {
+                continue;
+            }
+
+            String[] items = line.trim().split(":");
+            String host = items[0];
+            int port = Integer.parseInt(items[1]);
+            String userName = items.length > 2 ? items[2] : null;
+            String password = items.length > 3 ? items[3] : null;
+            String type = items.length > 4 ? items[4] : "HTTP";
+
+            if (proxyUser == null) {
+                proxyUser = userName;
+            }
+            if (proxyPass == null) {
+                proxyPass = password;
+            }
+            InetSocketAddress address = new InetSocketAddress(host, port);
+            proxies.add(new Proxy(Proxy.Type.valueOf(type), address));
         }
     }
 

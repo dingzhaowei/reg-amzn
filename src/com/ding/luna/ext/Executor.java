@@ -5,6 +5,9 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.net.Authenticator;
+import java.net.PasswordAuthentication;
+import java.net.Proxy;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +38,8 @@ public class Executor {
 
     private RootView rv;
 
+    private Proxy currProxy;
+
     private Document currPage;
 
     private String captchaText;
@@ -49,6 +54,10 @@ public class Executor {
     }
 
     public void run() {
+        if (RegInput.instance().hasProxy()) {
+            setProxyAuthenticator();
+        }
+
         try {
             List<Account> accounts = RegInput.instance().getAccounts();
 
@@ -96,6 +105,7 @@ public class Executor {
                     }
                 }
 
+                currProxy = RegInput.instance().getProxy();
                 try {
                     updateAccountProgress(a, "正在注册");
                     register(a);
@@ -298,7 +308,7 @@ public class Executor {
             img = doc.getElementById("ap_captcha_img").select("img").first();
         }
 
-        Connection conn = Jsoup.connect(img.absUrl("src"));
+        Connection conn = Jsoup.connect(img.absUrl("src")).proxy(currProxy);
         conn.userAgent(USERAGENT).timeout(15000).cookies(a.cookies());
         Response resp = conn.ignoreContentType(true).execute();
         File captchaFile = File.createTempFile("captcha", ".jpg");
@@ -431,35 +441,53 @@ public class Executor {
         }
 
         Map<String, List<String>> creditCards = RegInput.instance().getCreditCards();
-        List<String> creditCard = null;
-        String creditCardName = a.getCreditCard();
-        if (creditCardName.equals("随机选择")) {
-            int i = RAND.nextInt(creditCards.size());
-            for (Map.Entry<String, List<String>> entry : creditCards.entrySet()) {
-                if (--i < 0) {
-                    creditCard = entry.getValue();
+        if (RegInput.instance().getDomain().endsWith("jp") && creditCards.isEmpty()) {
+            LOG.info(a.getEmail() + "准备填写并提交支付信息");
+            Elements forms = currPage.select("form[action*=/account/address]");
+            for (int i = 0; i < forms.size(); i++) {
+                form = forms.get(i);
+                if (!form.select("input[value=CVS]").isEmpty()) {
                     break;
                 }
             }
+            data = extractFormData(form);
+            data.put("paymentMethod", "CVS");
+            data.put("editPaymentMethod", "次に進む");
+            data.remove("ue_back");
+            data.remove("newAddress");
+            data.remove("addressID_" + data.get("addressID"));
+            currPage = getPage(form.absUrl("action"), a, data);
         } else {
-            creditCard = creditCards.get(creditCardName);
-        }
-
-        LOG.info(a.getEmail() + "准备填写并提交支付信息");
-        Elements forms = currPage.select("form[action*=/account/address]");
-        for (int i = 0; i < forms.size(); i++) {
-            form = forms.get(i);
-            if (form.getElementById("creditCardIssuer") != null) {
-                break;
+            List<String> creditCard = null;
+            String creditCardName = a.getCreditCard();
+            if (creditCardName.equals("随机选择")) {
+                int i = RAND.nextInt(creditCards.size());
+                for (Map.Entry<String, List<String>> entry : creditCards.entrySet()) {
+                    if (--i < 0) {
+                        creditCard = entry.getValue();
+                        break;
+                    }
+                }
+            } else {
+                creditCard = creditCards.get(creditCardName);
             }
+
+            LOG.info(a.getEmail() + "准备填写并提交支付信息");
+            Elements forms = currPage.select("form[action*=/account/address]");
+            for (int i = 0; i < forms.size(); i++) {
+                form = forms.get(i);
+                if (form.getElementById("creditCardIssuer") != null) {
+                    break;
+                }
+            }
+            data = populateCreditCard(form, creditCard, domain);
+            data.remove("ue_back");
+            data.remove("newAddress");
+            Element submitBtn = form.select("input[name^=addressID_]").first();
+            data.put(submitBtn.attr("name") + ".x", "70");
+            data.put(submitBtn.attr("name") + ".y", "10");
+            currPage = getPage(form.absUrl("action"), a, data);
         }
-        data = populateCreditCard(form, creditCard, domain);
-        data.remove("ue_back");
-        data.remove("newAddress");
-        Element submitBtn = form.select("input[name^=addressID_]").first();
-        data.put(submitBtn.attr("name") + ".x", "70");
-        data.put(submitBtn.attr("name") + ".y", "10");
-        currPage = getPage(form.absUrl("action"), a, data);
         LOG.info(a.getEmail() + "的信用卡信息应已设置成功");
     }
 
@@ -570,7 +598,7 @@ public class Executor {
     }
 
     private Document getPage(String url, Account a, Map<String, String> data) throws Exception {
-        Connection conn = Jsoup.connect(url);
+        Connection conn = Jsoup.connect(url).proxy(currProxy);
         conn.userAgent(USERAGENT).timeout(TIMEOUT).cookies(a.cookies());
         Document doc = data == null ? conn.get() : conn.data(data).post();
         a.cookies().putAll(conn.response().cookies());
@@ -598,6 +626,22 @@ public class Executor {
         } finally {
             inputStream.close();
         }
+    }
+
+    private void setProxyAuthenticator() {
+        String userName = RegInput.instance().getProxyUserName();
+        String password = RegInput.instance().getProxyPassword();
+
+        if (userName == null) {
+            return;
+        }
+
+        Authenticator.setDefault(new Authenticator() {
+            @Override
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication(userName, password.toCharArray());
+            }
+        });
     }
 
     void saveCurrentPage() {
