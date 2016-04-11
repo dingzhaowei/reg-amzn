@@ -38,6 +38,8 @@ public class Executor {
 
     private RootView rv;
 
+    private boolean asApp;
+
     private Proxy currProxy;
 
     private Document currPage;
@@ -142,6 +144,7 @@ public class Executor {
             throw new RuntimeException("0");
         }
 
+        asApp = false;
         int bp = a.getLastBreakPoint();
 
         if (bp <= 1) {
@@ -177,6 +180,18 @@ public class Executor {
                 throw new RuntimeException("3");
             }
         }
+
+        if (bp <= 4) {
+            try {
+                updateAccountProgress(a, "开启一键");
+                asApp = true;
+                enableOneClick(a, domain);
+            } catch (Exception e) {
+                saveCurrentPage();
+                e.printStackTrace();
+                throw new RuntimeException("4");
+            }
+        }
     }
 
     private String getLoginUrl(String domain) {
@@ -185,6 +200,14 @@ public class Executor {
         sb.append("/gp/product/utility/edit-one-click-pref.html");
         sb.append("/ref=dp_oc_signin?ie=UTF8&query=&returnPath=");
         sb.append("%2Fgp%2Fcss%2Faccount%2Faddress%2Fview.html");
+        return sb.toString();
+    }
+
+    private String getOneClickEditUrl(String domain) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("https://").append(domain);
+        sb.append("/gp/product/utility/edit-one-click-pref.html");
+        sb.append("/ref=dp_oc_signin?ie=UTF8&query=&returnPath=%2F");
         return sb.toString();
     }
 
@@ -528,27 +551,42 @@ public class Executor {
     private void siginToAddrView(Account a, String domain) throws Exception {
         currPage = getPage(getLoginUrl(domain), a, null);
         if (currPage.location().contains("/ap/signin")) {
-            Element form = currPage.select("form[action*=/ap/signin]").first();
-            Map<String, String> data = extractFormData(form);
-            data.put("email", a.getEmail());
-            data.put("password", a.getPassword());
-            currPage = getPage(form.absUrl("action"), a, data);
-
-            captchaText = null;
-            if (isCaptchaPresent(currPage)) {
-                processCaptcha(currPage, a);
-                if (captchaText == null) {
-                    throw new RuntimeException("Captcha fail2");
-                }
-                form = currPage.select("form[action*=/ap/signin]").first();
-                data = extractFormData(form);
-                data.put("password", a.getPassword());
-                data.put("guess", captchaText);
-                currPage = getPage(form.absUrl("action"), a, data);
-            }
+            processSigninForm(a);
         }
         if (!currPage.location().contains("/account/address")) {
             currPage = getPage(getAddrViewUrl(domain), a, null);
+        }
+    }
+
+    private void enableOneClick(Account a, String domain) throws Exception {
+        currPage = getPage(getOneClickEditUrl(domain), a, null);
+        if (currPage.location().contains("/ap/signin")) {
+            processSigninForm(a);
+        }
+        if (!currPage.location().endsWith(domain)) {
+            System.out.println(currPage.location());
+            throw new RuntimeException("Not landed on successful page");
+        }
+    }
+
+    private void processSigninForm(Account a) throws Exception {
+        Element form = currPage.select("form[action*=/ap/signin]").first();
+        Map<String, String> data = extractFormData(form);
+        data.put("email", a.getEmail());
+        data.put("password", a.getPassword());
+        currPage = getPage(form.absUrl("action"), a, data);
+
+        captchaText = null;
+        if (isCaptchaPresent(currPage)) {
+            processCaptcha(currPage, a);
+            if (captchaText == null) {
+                throw new RuntimeException("Captcha fail2");
+            }
+            form = currPage.select("form[action*=/ap/signin]").first();
+            data = extractFormData(form);
+            data.put("password", a.getPassword());
+            data.put("guess", captchaText);
+            currPage = getPage(form.absUrl("action"), a, data);
         }
     }
 
@@ -594,12 +632,29 @@ public class Executor {
             return "";
         }
         s = s.replace("｛｝", "{}");
+        s = s.replace("{A}", randomString());
         return s.replace("{}", String.format("%04d", (int) (Math.random() * 10000)));
+    }
+
+    private String randomString() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 3 + (int) (Math.random() * 5); i++) {
+            char c = (char) ('a' + (int) (Math.random() * 26));
+            sb.append(i == 0 ? Character.toUpperCase(c) : c);
+        }
+        return sb.toString();
     }
 
     private Document getPage(String url, Account a, Map<String, String> data) throws Exception {
         Connection conn = Jsoup.connect(url).proxy(currProxy);
         conn.userAgent(USERAGENT).timeout(TIMEOUT).cookies(a.cookies());
+        if (asApp) {
+            conn.userAgent(AmznApp.appUA);
+            conn.cookie("amzn-app-id", AmznApp.appID);
+            conn.cookie("amzn-app-ctxt", AmznApp.appCtxt);
+            conn.cookie("mobile-device-info", "scale:2|w:375|h:667");
+            conn.header("X-Requested-With", "cn.amazon.mShop.android");
+        }
         Document doc = data == null ? conn.get() : conn.data(data).post();
         a.cookies().putAll(conn.response().cookies());
         return doc;
