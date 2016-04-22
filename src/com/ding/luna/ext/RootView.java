@@ -197,13 +197,13 @@ public class RootView {
         numPerGroupField.getSelectionModel().select(10);
 
         intervalPerGroupField.getItems().add("无间隔");
-        for (int j = 1; j <= 6; j++) {
+        for (int j = 1; j <= 24; j++) {
             intervalPerGroupField.getItems().add(String.format("%d分钟", j * 5));
         }
         intervalPerGroupField.getSelectionModel().select(2);
 
         intervalPerAccountField.getItems().add("无间隔");
-        for (int j = 1; j <= 4; j++) {
+        for (int j = 1; j <= 10; j++) {
             intervalPerAccountField.getItems().add(String.format("%.1f分钟", j * 0.5));
         }
         intervalPerAccountField.getSelectionModel().select(0);
