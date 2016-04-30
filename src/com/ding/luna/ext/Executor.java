@@ -463,18 +463,20 @@ public class Executor {
             return; // 已配置信用卡
         }
 
+        LOG.info(a.getEmail() + "准备填写并提交支付信息");
         Map<String, List<String>> creditCards = RegInput.instance().getCreditCards();
         if (RegInput.instance().getDomain().endsWith("jp") && creditCards.isEmpty()) {
-            LOG.info(a.getEmail() + "准备填写并提交支付信息");
             Elements forms = currPage.select("form[action*=/account/address]");
+            List<String> directives = RegInput.instance().getDirectives();
+            String pm = directives.contains("无信用卡时设置货到付款") ? "COD" : "CVS";
             for (int i = 0; i < forms.size(); i++) {
                 form = forms.get(i);
-                if (!form.select("input[value=CVS]").isEmpty()) {
+                if (!form.select("input[value=" + pm + "]").isEmpty()) {
                     break;
                 }
             }
             data = extractFormData(form);
-            data.put("paymentMethod", "CVS");
+            data.put("paymentMethod", pm);
             data.put("editPaymentMethod", "次に進む");
             data.remove("ue_back");
             data.remove("newAddress");
