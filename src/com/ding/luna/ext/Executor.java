@@ -107,7 +107,13 @@ public class Executor {
                     }
                 }
 
-                currProxy = RegInput.instance().getProxy();
+                if (n == 0) {
+                    currProxy = RegInput.instance().getProxy();
+                    if (currProxy != null) {
+                        LOG.info("当前代理服务器: " + currProxy.toString());
+                    }
+                }
+
                 try {
                     updateAccountProgress(a, "正在注册");
                     register(a);
@@ -343,7 +349,7 @@ public class Executor {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        } );
+        });
         synchronized (this) {
             while (true) {
                 try {
@@ -595,20 +601,20 @@ public class Executor {
     private void updateProgressWithCount(String msg) {
         Platform.runLater(() -> {
             rv.setProgress(String.format("%s，成功：%d，失败：%d", msg, ns, nf));
-        } );
+        });
     }
 
     private void updateProgressWithoutCount(String msg) {
         Platform.runLater(() -> {
             rv.setProgress(msg);
-        } );
+        });
     }
 
     private void updateAccountProgress(Account a, String msg) {
         Platform.runLater(() -> {
             a.setRegProgress(msg);
             rv.refreshAccountPrgress();
-        } );
+        });
     }
 
     private void waitForTime(long time) {
