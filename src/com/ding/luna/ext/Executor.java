@@ -76,7 +76,7 @@ public class Executor {
             startIndex = startIndex < 0 ? 0 : startIndex;
             endIndex = endIndex >= accounts.size() ? accounts.size() - 1 : endIndex;
 
-            int n = -1;
+            int n = -1, m = -1;
             for (int i = startIndex; i <= endIndex; i++) {
                 synchronized (this) {
                     if (stop) {
@@ -107,7 +107,8 @@ public class Executor {
                     }
                 }
 
-                if (n == 0) {
+                if (++m >= RegInput.instance().getNumAccountsPerProxy()) {
+                    m = 0;
                     currProxy = RegInput.instance().getProxy();
                     if (currProxy != null) {
                         LOG.info("当前代理服务器: " + currProxy.toString());

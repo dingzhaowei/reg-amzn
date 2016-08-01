@@ -22,6 +22,8 @@ public class RegInput {
 
     private int proxyIndex;
 
+    private int naPerProxy;
+
     private String proxyUser;
 
     private String proxyPass;
@@ -41,6 +43,7 @@ public class RegInput {
     }
 
     private RegInput() {
+        naPerProxy = 10;
         addresses = new LinkedHashMap<>();
         creditCards = new LinkedHashMap<>();
         accounts = new ArrayList<>();
@@ -91,6 +94,10 @@ public class RegInput {
 
     public String getProxyPassword() {
         return proxyPass;
+    }
+
+    public int getNumAccountsPerProxy() {
+        return naPerProxy;
     }
 
     public List<String> getDirectives() {
@@ -207,7 +214,13 @@ public class RegInput {
                 continue;
             }
 
-            String[] items = line.trim().split(":");
+            line = line.trim();
+            if (line.startsWith("Accounts/Proxy")) {
+                naPerProxy = Integer.parseInt(line.split("=")[1]);
+                continue;
+            }
+
+            String[] items = line.split(":");
             String host = items[0];
             int port = Integer.parseInt(items[1]);
             String userName = items.length > 2 ? items[2] : null;
