@@ -191,7 +191,7 @@ public class RootView {
         configureForm.getChildren().add(createField("每号间隔时间:", intervalPerAccountField));
 
         numPerGroupField.getItems().add("不分组");
-        for (int j = 1; j <= 20; j++) {
+        for (int j = 1; j <= 50; j++) {
             numPerGroupField.getItems().add(String.format("%d个/组", j));
         }
         numPerGroupField.getSelectionModel().select(10);
