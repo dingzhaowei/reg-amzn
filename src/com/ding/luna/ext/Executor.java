@@ -38,6 +38,8 @@ public class Executor {
 
     private RootView rv;
 
+    private boolean asApp;
+
     private Proxy currProxy;
 
     private Document currPage;
@@ -74,7 +76,7 @@ public class Executor {
             startIndex = startIndex < 0 ? 0 : startIndex;
             endIndex = endIndex >= accounts.size() ? accounts.size() - 1 : endIndex;
 
-            int n = -1;
+            int n = -1, m = -1;
             for (int i = startIndex; i <= endIndex; i++) {
                 synchronized (this) {
                     if (stop) {
@@ -105,7 +107,14 @@ public class Executor {
                     }
                 }
 
-                currProxy = RegInput.instance().getProxy();
+                if (++m >= RegInput.instance().getNumAccountsPerProxy()) {
+                    m = 0;
+                    currProxy = RegInput.instance().getProxy();
+                    if (currProxy != null) {
+                        LOG.info("当前代理服务器: " + currProxy.toString());
+                    }
+                }
+
                 try {
                     updateAccountProgress(a, "正在注册");
                     register(a);
@@ -142,6 +151,7 @@ public class Executor {
             throw new RuntimeException("0");
         }
 
+        asApp = false;
         int bp = a.getLastBreakPoint();
 
         if (bp <= 1) {
@@ -177,37 +187,64 @@ public class Executor {
                 throw new RuntimeException("3");
             }
         }
+
+        if (bp <= 4) {
+            try {
+                updateAccountProgress(a, "开启一键");
+                asApp = true;
+                enableOneClick(a, domain);
+            } catch (Exception e) {
+                saveCurrentPage();
+                e.printStackTrace();
+                throw new RuntimeException("4");
+            }
+        }
     }
 
-    private String getLoginUrl(String domain) {
+    private String getLoginUrl1(String domain) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("https://").append(domain);
+        sb.append("/gp/product/utility/edit-one-click-pref.html");
+        sb.append("/ref=dp_oc_signin?ie=UTF8&query=&returnPath=");
+        sb.append("%2Fa%2Faddresses%2Fref=ab_redirect");
+        return sb.toString();
+    }
+
+    private String getLoginUrl2(String domain) {
         StringBuilder sb = new StringBuilder();
         sb.append("https://").append(domain);
         sb.append("/gp/product/utility/edit-one-click-pref.html");
         sb.append("/ref=dp_oc_signin?ie=UTF8&query=&returnPath=");
         sb.append("%2Fgp%2Fcss%2Faccount%2Faddress%2Fview.html");
+        sb.append("%3FOneClickSettingsQuery=1");
+        sb.append("%2Fref=ya_address_book_one_click_link");
+        return sb.toString();
+    }
+
+    private String getOneClickEditUrl(String domain) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("https://").append(domain);
+        sb.append("/gp/product/utility/edit-one-click-pref.html");
+        sb.append("/ref=dp_oc_signin?ie=UTF8&query=&returnPath=%2F");
         return sb.toString();
     }
 
     private String getAddrViewUrl(String domain) {
         StringBuilder sb = new StringBuilder();
         sb.append("https://").append(domain);
-        sb.append("/gp/css/account/address/view.html");
-        sb.append("?ie=UTF8&ref_=ya_change_1_click");
-        return sb.toString();
+        return sb.append("/a/addresses/ref=ab_redirect").toString();
     }
 
     private String getAddrEditUrl(String domain) {
         StringBuilder sb = new StringBuilder();
         sb.append("https://").append(domain);
-        sb.append("/gp/css/account/address/view.html");
-        sb.append("?ie=UTF8&isDomestic=1&ref_=");
-        sb.append("myab_view_domestic_address_form&viewID=newAddress");
+        sb.append("/a/addresses/add?ref=ya_address_book_add_button");
         return sb.toString();
     }
 
     private void stage1(Account a, String domain) throws Exception {
-        currPage = getPage(getLoginUrl(domain), a, null);
-        if (currPage.location().contains("/account/address")) {
+        currPage = getPage(getLoginUrl1(domain), a, null);
+        if (currPage.location().contains("/a/addresses")) {
             LOG.info(a.getEmail() + "已经是登录状态，跳过阶段1");
             return;
         }
@@ -277,10 +314,13 @@ public class Executor {
             }
         } catch (Exception e) {
             LOG.info(a.getEmail() + "提交注册时遇到问题，检查是否已成功");
-            currPage = getPage(getLoginUrl(domain), a, null);
+            currPage = getPage(getLoginUrl1(domain), a, null);
         }
-        link = currPage.getElementById("nav-link-yourAccount");
-        if (link == null || !link.absUrl("href").contains("/gp/css/homepage.html")) {
+        link = currPage.getElementById("nav-link-accountList");
+        if (link == null) {
+            link = currPage.getElementById("nav-link-yourAccount");
+        }
+        if (link == null || !link.absUrl("href").contains("/homepage.html")) {
             throw new RuntimeException("Not landed on successful page");
         }
         LOG.info(a.getEmail() + "的账号已经成功建立，准备添加地址和支付");
@@ -320,7 +360,7 @@ public class Executor {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        } );
+        });
         synchronized (this) {
             while (true) {
                 try {
@@ -338,11 +378,11 @@ public class Executor {
     }
 
     private void stage2(Account a, String domain) throws Exception {
-        if (currPage == null || !currPage.location().contains("/account/address")) {
+        if (currPage == null || !currPage.location().contains("/a/addresses")) {
             LOG.info(a.getEmail() + "通过登录跳到地址/一键管理页面");
             siginToAddrView(a, domain);
         }
-        if (!currPage.select("[id^=address-index]").isEmpty()) {
+        if (currPage.getElementById("ya-myab-display-address-block-0") != null) {
             LOG.info(a.getEmail() + "已经有之前添加的地址，跳过阶段2");
             return; // 已添加过地址
         }
@@ -366,12 +406,10 @@ public class Executor {
         currPage = getPage(getAddrEditUrl(domain), a, null);
 
         LOG.info(a.getEmail() + "准备填写并提交新地址");
-        Element form = currPage.select("form[action*=/account/address]").first();
+        Element form = currPage.select("form[action*=/a/addresses/add]").first();
         Map<String, String> data = populateAddress(form, address, domain);
-        Element submitBtn = form.getElementById("myab_newAddressButton");
-        data.put(submitBtn.attr("name"), submitBtn.attr("value"));
         currPage = getPage(form.absUrl("action"), a, data);
-        if (currPage.select("[id^=address-index]").isEmpty()) {
+        if (currPage.getElementById("ya-myab-display-address-block-0") == null) {
             throw new RuntimeException("Address failed to be added");
         }
         LOG.info(a.getEmail() + "新地址添加成功，准备添加支付");
@@ -379,44 +417,36 @@ public class Executor {
 
     private Map<String, String> populateAddress(Element form, List<String> address, String domain) {
         Map<String, String> data = extractFormData(form);
+        String prefix = "address-ui-widgets-";
+        String countryCode = domain.substring(domain.lastIndexOf(".") + 1);
+
+        data.put(prefix + "countryCode", countryCode.toUpperCase());
+        data.put(prefix + "enterAddressFullName", replacePlaceHolder(address.get(0)));
+
         if (domain.contains("amazon.co.jp")) {
-            data.put("enterAddressFullName", replacePlaceHolder(address.get(0)));
-
             String[] postCode = replacePlaceHolder(address.get(1)).split("-");
-            data.put("enterAddressPostalCode", postCode[0]);
-            data.put("enterAddressPostalCode2", postCode[1]);
-
-            data.put("enterAddressStateOrRegion", replacePlaceHolder(address.get(2)));
-            data.put("enterAddressAddressLine1", replacePlaceHolder(address.get(3)));
-            data.put("enterAddressAddressLine2", replacePlaceHolder(address.get(4)));
-            data.put("enterAddressAddressLine3", replacePlaceHolder(address.get(5)));
-            data.put("enterAddressPhoneNumber", replacePlaceHolder(address.get(6)));
+            data.put(prefix + "enterAddressPostalCodeOne", postCode[0]);
+            data.put(prefix + "enterAddressPostalCodeTwo", postCode[1]);
+            data.put(prefix + "enterAddressStateOrRegion", replacePlaceHolder(address.get(2)));
+            data.put(prefix + "enterAddressLine1", replacePlaceHolder(address.get(3)));
+            data.put(prefix + "enterAddressLine2", replacePlaceHolder(address.get(4)));
+            data.put(prefix + "enterAddressLine3", replacePlaceHolder(address.get(5)));
+            data.put(prefix + "enterAddressPhoneNumber", replacePlaceHolder(address.get(6)));
         } else {
-            data.put("enterAddressFullName", replacePlaceHolder(address.get(0)));
-            data.put("enterAddressAddressLine1", replacePlaceHolder(address.get(1)));
-            data.put("enterAddressAddressLine2", replacePlaceHolder(address.get(2)));
-            data.put("enterAddressCity", replacePlaceHolder(address.get(3)));
-            data.put("enterAddressStateOrRegion", replacePlaceHolder(address.get(4)));
-            data.put("enterAddressPostalCode", replacePlaceHolder(address.get(5)));
-
-            Elements options = form.getElementById("enterAddressCountryCode").select("option");
-            String country = replacePlaceHolder(address.get(6)), countryCode = "";
-            for (Element option : options) {
-                if (option.text().trim().equals(country)) {
-                    countryCode = option.attr("value");
-                    break;
-                }
-            }
-            data.put("enterAddressCountryCode", countryCode);
-            data.put("enterAddressPhoneNumber", replacePlaceHolder(address.get(7)));
+            data.put(prefix + "enterAddressLine1", replacePlaceHolder(address.get(1)));
+            data.put(prefix + "enterAddressLine2", replacePlaceHolder(address.get(2)));
+            data.put(prefix + "enterAddressCity", replacePlaceHolder(address.get(3)));
+            data.put(prefix + "enterAddressStateOrRegion", replacePlaceHolder(address.get(4)));
+            data.put(prefix + "enterAddressPostalCode", replacePlaceHolder(address.get(5)));
+            data.put(prefix + "enterAddressPhoneNumber", replacePlaceHolder(address.get(6)));
         }
         return data;
     }
 
     private void stage3(Account a, String domain) throws Exception {
-        if (currPage == null || !currPage.location().contains("/account/address")) {
+        if (currPage == null || !currPage.location().contains("OneClickSettingsQuery")) {
             LOG.info(a.getEmail() + "通过登录跳到地址/一键管理页面");
-            siginToAddrView(a, domain);
+            siginToOneClickSettings(a, domain);
         }
         if (currPage.select("[id^=address-index]").isEmpty()) {
             throw new RuntimeException("There is no address");
@@ -440,18 +470,20 @@ public class Executor {
             return; // 已配置信用卡
         }
 
+        LOG.info(a.getEmail() + "准备填写并提交支付信息");
         Map<String, List<String>> creditCards = RegInput.instance().getCreditCards();
         if (RegInput.instance().getDomain().endsWith("jp") && creditCards.isEmpty()) {
-            LOG.info(a.getEmail() + "准备填写并提交支付信息");
             Elements forms = currPage.select("form[action*=/account/address]");
+            List<String> directives = RegInput.instance().getDirectives();
+            String pm = directives.contains("无信用卡时设置货到付款") ? "COD" : "CVS";
             for (int i = 0; i < forms.size(); i++) {
                 form = forms.get(i);
-                if (!form.select("input[value=CVS]").isEmpty()) {
+                if (!form.select("input[value=" + pm + "]").isEmpty()) {
                     break;
                 }
             }
             data = extractFormData(form);
-            data.put("paymentMethod", "CVS");
+            data.put("paymentMethod", pm);
             data.put("editPaymentMethod", "次に進む");
             data.remove("ue_back");
             data.remove("newAddress");
@@ -526,49 +558,74 @@ public class Executor {
     }
 
     private void siginToAddrView(Account a, String domain) throws Exception {
-        currPage = getPage(getLoginUrl(domain), a, null);
+        currPage = getPage(getLoginUrl1(domain), a, null);
         if (currPage.location().contains("/ap/signin")) {
-            Element form = currPage.select("form[action*=/ap/signin]").first();
-            Map<String, String> data = extractFormData(form);
-            data.put("email", a.getEmail());
-            data.put("password", a.getPassword());
-            currPage = getPage(form.absUrl("action"), a, data);
-
-            captchaText = null;
-            if (isCaptchaPresent(currPage)) {
-                processCaptcha(currPage, a);
-                if (captchaText == null) {
-                    throw new RuntimeException("Captcha fail2");
-                }
-                form = currPage.select("form[action*=/ap/signin]").first();
-                data = extractFormData(form);
-                data.put("password", a.getPassword());
-                data.put("guess", captchaText);
-                currPage = getPage(form.absUrl("action"), a, data);
-            }
+            processSigninForm(a);
         }
-        if (!currPage.location().contains("/account/address")) {
+        if (!currPage.location().contains("/a/addresses")) {
             currPage = getPage(getAddrViewUrl(domain), a, null);
+        }
+    }
+
+    private void siginToOneClickSettings(Account a, String domain) throws Exception {
+        currPage = getPage(getLoginUrl2(domain), a, null);
+        if (currPage.location().contains("/ap/signin")) {
+            processSigninForm(a);
+        }
+        if (!currPage.location().contains("OneClickSettingsQuery")) {
+            currPage = getPage(getAddrViewUrl(domain), a, null);
+        }
+    }
+
+    private void enableOneClick(Account a, String domain) throws Exception {
+        currPage = getPage(getOneClickEditUrl(domain), a, null);
+        if (currPage.location().contains("/ap/signin")) {
+            processSigninForm(a);
+        }
+        if (!currPage.location().endsWith(domain)) {
+            System.out.println(currPage.location());
+            throw new RuntimeException("Not landed on successful page");
+        }
+    }
+
+    private void processSigninForm(Account a) throws Exception {
+        Element form = currPage.select("form[action*=/ap/signin]").first();
+        Map<String, String> data = extractFormData(form);
+        data.put("email", a.getEmail());
+        data.put("password", a.getPassword());
+        currPage = getPage(form.absUrl("action"), a, data);
+
+        captchaText = null;
+        if (isCaptchaPresent(currPage)) {
+            processCaptcha(currPage, a);
+            if (captchaText == null) {
+                throw new RuntimeException("Captcha fail2");
+            }
+            form = currPage.select("form[action*=/ap/signin]").first();
+            data = extractFormData(form);
+            data.put("password", a.getPassword());
+            data.put("guess", captchaText);
+            currPage = getPage(form.absUrl("action"), a, data);
         }
     }
 
     private void updateProgressWithCount(String msg) {
         Platform.runLater(() -> {
             rv.setProgress(String.format("%s，成功：%d，失败：%d", msg, ns, nf));
-        } );
+        });
     }
 
     private void updateProgressWithoutCount(String msg) {
         Platform.runLater(() -> {
             rv.setProgress(msg);
-        } );
+        });
     }
 
     private void updateAccountProgress(Account a, String msg) {
         Platform.runLater(() -> {
             a.setRegProgress(msg);
             rv.refreshAccountPrgress();
-        } );
+        });
     }
 
     private void waitForTime(long time) {
@@ -594,12 +651,29 @@ public class Executor {
             return "";
         }
         s = s.replace("｛｝", "{}");
+        s = s.replace("{A}", randomString());
         return s.replace("{}", String.format("%04d", (int) (Math.random() * 10000)));
+    }
+
+    private String randomString() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 3 + (int) (Math.random() * 5); i++) {
+            char c = (char) ('a' + (int) (Math.random() * 26));
+            sb.append(i == 0 ? Character.toUpperCase(c) : c);
+        }
+        return sb.toString();
     }
 
     private Document getPage(String url, Account a, Map<String, String> data) throws Exception {
         Connection conn = Jsoup.connect(url).proxy(currProxy);
         conn.userAgent(USERAGENT).timeout(TIMEOUT).cookies(a.cookies());
+        if (asApp) {
+            conn.userAgent(AmznApp.appUA);
+            conn.cookie("amzn-app-id", AmznApp.appID);
+            conn.cookie("amzn-app-ctxt", AmznApp.appCtxt);
+            conn.cookie("mobile-device-info", "scale:2|w:375|h:667");
+            conn.header("X-Requested-With", "cn.amazon.mShop.android");
+        }
         Document doc = data == null ? conn.get() : conn.data(data).post();
         a.cookies().putAll(conn.response().cookies());
         return doc;

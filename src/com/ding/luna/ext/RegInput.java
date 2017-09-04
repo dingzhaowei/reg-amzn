@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,8 @@ public class RegInput {
 
     private int proxyIndex;
 
+    private int naPerProxy;
+
     private String proxyUser;
 
     private String proxyPass;
@@ -28,6 +31,8 @@ public class RegInput {
     private List<Proxy> proxies;
 
     private List<Account> accounts;
+
+    private List<String> directives;
 
     private Map<String, List<String>> addresses;
 
@@ -38,6 +43,7 @@ public class RegInput {
     }
 
     private RegInput() {
+        naPerProxy = 10;
         addresses = new LinkedHashMap<>();
         creditCards = new LinkedHashMap<>();
         accounts = new ArrayList<>();
@@ -90,6 +96,17 @@ public class RegInput {
         return proxyPass;
     }
 
+    public int getNumAccountsPerProxy() {
+        return naPerProxy;
+    }
+
+    public List<String> getDirectives() {
+        if (directives == null) {
+            return new ArrayList<>();
+        }
+        return directives;
+    }
+
     public List<Account> getAccounts() {
         return accounts;
     }
@@ -104,6 +121,7 @@ public class RegInput {
 
     public void clear() {
         country = null;
+        directives = null;
         addresses.clear();
         creditCards.clear();
         accounts.clear();
@@ -115,9 +133,17 @@ public class RegInput {
         try {
             String line = null;
             while ((line = in.readLine()) != null) {
-                line = line.trim();
+                if ((line = line.trim()).isEmpty()) {
+                    continue;
+                }
 
-                if (country == null && !line.isEmpty() && !line.startsWith("#")) {
+                if (directives == null && line.startsWith("@")) {
+                    line = line.substring(1).replace("；", ";");
+                    directives = Arrays.asList(line.split(";"));
+                    continue;
+                }
+
+                if (country == null && !line.startsWith("#")) {
                     country = line;
                     continue;
                 }
@@ -188,7 +214,13 @@ public class RegInput {
                 continue;
             }
 
-            String[] items = line.trim().split(":");
+            line = line.trim();
+            if (line.startsWith("Accounts/Proxy")) {
+                naPerProxy = Integer.parseInt(line.split("=")[1]);
+                continue;
+            }
+
+            String[] items = line.split(":");
             String host = items[0];
             int port = Integer.parseInt(items[1]);
             String userName = items.length > 2 ? items[2] : null;
